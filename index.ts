@@ -1,5 +1,3 @@
-// lambda calculus parser
-
 type Variable = ["var", string]
 type Abstraction = ["abstraction", string, Expr]
 type Application = ["application", Expr, Expr]
@@ -21,8 +19,7 @@ type State<
 
 type InitialState<T extends string> = State<T, [], []>
 
-type TrimLeft<S extends string> =
-  S extends `${" " | "\n" | "\t"}${infer Rest}` ? TrimLeft<Rest> : S
+type TrimLeft<S extends string> = S extends `${" " | "\n" | "\t"}${infer Rest}` ? TrimLeft<Rest> : S
 
 type ConsumeChar<S extends State, Ch extends string> = TrimLeft<
   S["unscanned"] extends `${Ch}${infer Rest}` ? Rest : S["unscanned"]
@@ -42,22 +39,28 @@ type AccumulateStr<S extends string, Acc extends string = ""> =
 
 type IsDelimiter<S extends string> = S extends " " | "(" | ")" ? true : false
 
-type PushStack<S extends State> = State<
-  ConsumeChar<S, "(">,
-  [],
-  [...S["stack"], S["current"]]
->
+type PushStack<S extends State> = State<ConsumeChar<S, "(">, [], [...S["stack"], S["current"]]>
 
 type PopStack<S extends State> =
-  S["stack"] extends (
-    [...infer Stack extends Expr[][], infer Tail extends Expr[]]
-  ) ?
-    State<ConsumeChar<S, ")" | " ">, [...Tail, ...S["current"]], Stack>
+  S["stack"] extends [...infer Stack extends Expr[][], infer Tail extends Expr[]] ?
+    State<
+      ConsumeChar<S, ")" | " ">,
+      [
+        ...Tail,
+        // ... TODO
+        ...S["current"]
+      ],
+      Stack
+    >
   : never
+
+type ShiftAbstraction<S extends State> = S
+
+type ShiftIdentifier<S extends State> = S
 
 type Parse<S extends State> =
   S["unscanned"] extends "" ? S["current"]
   : S["unscanned"] extends `(${string}` ? Parse<PushStack<S>>
   : S["unscanned"] extends `${")" | " "}${string}` ? Parse<PopStack<S>>
-  : S["unscanned"] extends `${Lambda}${infer Rest}` ? [Lambda, Rest]
-  : S
+  : S["unscanned"] extends `${Lambda}${string}` ? Parse<ShiftAbstraction<S>>
+  : Parse<ShiftIdentifier<S>>
