@@ -41,6 +41,11 @@ type IsDelimiter<S extends string> = S extends " " | "(" | ")" ? true : false
 
 type PushStack<S extends State> = State<ConsumeChar<S, "(">, [], [...S["stack"], S["current"]]>
 
+type AppendExpr<S extends State, Type extends Expr[0], Value extends any[]> = [
+  ...S["current"],
+  [Type, ...Value]
+]
+
 type PopStack<S extends State> =
   S["stack"] extends [...infer Stack extends Expr[][], infer Tail extends Expr[]] ?
     State<
@@ -56,7 +61,15 @@ type PopStack<S extends State> =
 
 type ShiftAbstraction<S extends State> = S
 
-type ShiftIdentifier<S extends State> = S
+type ShiftIdentifier<S extends State> =
+  S["unscanned"] extends `${infer Char}${string}` ?
+    IsDelimiter<Char> extends true ? S
+    : AccumulateStr<S["unscanned"]> extends (
+      [infer Str extends string, infer Remaining extends string]
+    ) ?
+      State<TrimLeft<Remaining>, AppendExpr<S, "var", [Str]>, S["stack"]>
+    : S
+  : S
 
 type Parse<S extends State> =
   S["unscanned"] extends "" ? S["current"]
@@ -64,3 +77,5 @@ type Parse<S extends State> =
   : S["unscanned"] extends `${")" | " "}${string}` ? Parse<PopStack<S>>
   : S["unscanned"] extends `${Lambda}${string}` ? Parse<ShiftAbstraction<S>>
   : Parse<ShiftIdentifier<S>>
+
+// type result = Parse<InitialState<" λ">>
