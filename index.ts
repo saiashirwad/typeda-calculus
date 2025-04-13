@@ -1,17 +1,13 @@
 type GenericFunction = (...x: never[]) => unknown
 
 abstract class HKT {
-  readonly _1?: unknown
-  new!: GenericFunction
+  readonly arg?: unknown
+  fn!: GenericFunction
 }
 
 type Assume<T, U> = T extends U ? T : U
 
-type Apply<F extends HKT, _1> = ReturnType<
-  (F & {
-    readonly _1: _1
-  })["new"]
->
+type Apply<F extends HKT, arg> = ReturnType<(F & { readonly arg: arg })["fn"]>
 
 type Compose<HKTs extends HKT[], X> =
   HKTs extends [] ? X
@@ -25,15 +21,19 @@ type Reverse<T extends unknown[]> =
   : never
 
 interface Flow<HKTs extends HKT[]> extends HKT {
-  new: (x: this["_1"]) => Compose<Reverse<HKTs>, this["_1"]>
+  fn: (x: this["arg"]) => Compose<Reverse<HKTs>, this["arg"]>
 }
 
 interface DoubleString extends HKT {
-  new: (x: Assume<this["_1"], string>) => `${typeof x}${typeof x}`
+  fn: (x: Assume<this["arg"], string>) => `${typeof x}${typeof x}`
 }
 
 interface Append<S extends string> extends HKT {
-  new: (x: Assume<this["_1"], string>) => `${typeof x}${S}`
+  fn: (x: Assume<this["arg"], string>) => `${typeof x}${S}`
 }
 
 type asdf = Apply<DoubleString, "asdf">
+
+type appendedResult = Apply<Append<"hi  ">, asdf>
+
+type composedResult = Apply<Flow<[DoubleString, Append<"hi  ">]>, "asdf">
