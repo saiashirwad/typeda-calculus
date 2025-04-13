@@ -1,13 +1,11 @@
-type GenericFunction = (...x: never[]) => unknown
-
 abstract class HKT {
   readonly arg?: unknown
-  fn!: GenericFunction
+  fn!: (...x: never[]) => unknown
 }
 
-type Assume<T, U> = T extends U ? T : U
-
 type Apply<F extends HKT, arg> = ReturnType<(F & { readonly arg: arg })["fn"]>
+
+type Assume<T, U> = T extends U ? T : U
 
 type Compose<HKTs extends HKT[], X> =
   HKTs extends [] ? X
@@ -28,12 +26,22 @@ interface DoubleString extends HKT {
   fn: (x: Assume<this["arg"], string>) => `${typeof x}${typeof x}`
 }
 
-interface Append<S extends string> extends HKT {
-  fn: (x: Assume<this["arg"], string>) => `${typeof x}${S}`
+interface Identity extends HKT {
+  fn: (x: Assume<this["arg"], unknown>) => typeof x
 }
 
-type asdf = Apply<DoubleString, "asdf">
+interface Append<S extends string> extends HKT {
+  fn: (x: Assume<this["arg"], string>) => `${S}${typeof x}`
+}
 
-type appendedResult = Apply<Append<"hi  ">, asdf>
+interface Mockingbird extends HKT {
+  fn: (x: Assume<this["arg"], HKT>) => Apply<typeof x, typeof x>
+}
 
-type composedResult = Apply<Flow<[DoubleString, Append<"hi  ">]>, "asdf">
+interface Kestrel<A = any> extends HKT {
+  fn: (x: Assume<this["arg"], any>) => A
+}
+
+type Kite<A> = Apply<Kestrel<Identity>, A>
+
+type asdf = Apply<Kite<2>, 5>
