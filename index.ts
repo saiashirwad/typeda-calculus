@@ -1,47 +1,63 @@
-abstract class HKT {
-  readonly arg?: unknown
-  fn!: (...x: never[]) => unknown
-}
+// lambda calculus parser
 
-type Apply<F extends HKT, arg> = ReturnType<(F & { readonly arg: arg })["fn"]>
+type Variable = ["var", string]
+type Abstraction = ["abstraction", string, Expr]
+type Application = ["application", Expr, Expr]
+type Expr = Variable | Abstraction | Application
 
-type Assume<T, U> = T extends U ? T : U
+type Lambda = "λ"
 
-type Compose<HKTs extends HKT[], X> =
-  HKTs extends [] ? X
-  : HKTs extends [infer Head, ...infer Tail] ?
-    Apply<Assume<Head, HKT>, Compose<Assume<Tail, HKT[]>, X>>
+// <expression> ::= <variable>                  -- A variable is an expression
+//               | 'λ' <variable> '.' <expression> -- An abstraction (lambda)
+//               | <expression> <expression>     -- An application
+//               | '(' <expression> ')'          -- Parentheses for grouping/precedence
+// <variable>   ::= <identifier>                -- e.g., a sequence of letters
+
+type State<
+  unscanned extends string = any,
+  current extends Expr[] = Expr[],
+  stack extends Expr[][] = Expr[][]
+> = { unscanned: unscanned; current: current; stack: stack }
+
+type InitialState<T extends string> = State<T, [], []>
+
+type TrimLeft<S extends string> =
+  S extends `${" " | "\n" | "\t"}${infer Rest}` ? TrimLeft<Rest> : S
+
+type ConsumeChar<S extends State, Ch extends string> = TrimLeft<
+  S["unscanned"] extends `${Ch}${infer Rest}` ? Rest : S["unscanned"]
+>
+
+type ShiftVariable<S extends State> =
+  S["unscanned"] extends `${infer Ch}${infer Rest}` ?
+    State<TrimLeft<Rest>, [...S["current"], [type: "var", value: Ch]]>
+  : S
+
+type AccumulateStr<S extends string, Acc extends string = ""> =
+  S extends `${infer Ch}${infer Rest}` ?
+    IsDelimiter<Ch> extends true ?
+      [Acc, S]
+    : AccumulateStr<Rest, `${Acc}${Ch}`>
+  : [Acc, S]
+
+type IsDelimiter<S extends string> = S extends " " | "(" | ")" ? true : false
+
+type PushStack<S extends State> = State<
+  ConsumeChar<S, "(">,
+  [],
+  [...S["stack"], S["current"]]
+>
+
+type PopStack<S extends State> =
+  S["stack"] extends (
+    [...infer Stack extends Expr[][], infer Tail extends Expr[]]
+  ) ?
+    State<ConsumeChar<S, ")" | " ">, [...Tail, ...S["current"]], Stack>
   : never
 
-type Reverse<T extends unknown[]> =
-  T extends [] ? []
-  : T extends [infer U, ...infer Rest] ? [...Reverse<Rest>, U]
-  : never
-
-interface Flow<HKTs extends HKT[]> extends HKT {
-  fn: (x: this["arg"]) => Compose<Reverse<HKTs>, this["arg"]>
-}
-
-interface DoubleString extends HKT {
-  fn: (x: Assume<this["arg"], string>) => `${typeof x}${typeof x}`
-}
-
-interface Identity extends HKT {
-  fn: (x: Assume<this["arg"], unknown>) => typeof x
-}
-
-interface Append<S extends string> extends HKT {
-  fn: (x: Assume<this["arg"], string>) => `${S}${typeof x}`
-}
-
-interface Mockingbird extends HKT {
-  fn: (x: Assume<this["arg"], HKT>) => Apply<typeof x, typeof x>
-}
-
-interface Kestrel<A = any> extends HKT {
-  fn: (x: Assume<this["arg"], any>) => A
-}
-
-type Kite<A> = Apply<Kestrel<Identity>, A>
-
-type asdf = Apply<Kite<2>, 5>
+type Parse<S extends State> =
+  S["unscanned"] extends "" ? S["current"]
+  : S["unscanned"] extends `(${string}` ? Parse<PushStack<S>>
+  : S["unscanned"] extends `${")" | " "}${string}` ? Parse<PopStack<S>>
+  : S["unscanned"] extends `${Lambda}${infer Rest}` ? [Lambda, Rest]
+  : S
