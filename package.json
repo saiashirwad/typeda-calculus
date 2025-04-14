@@ -11,7 +11,7 @@
 		"typescript": "^5"
 	},
 	"prettier": {
-		"printWidth": 100,
+		"printWidth": 60,
 		"useTabs": false,
 		"semi": false,
 		"trailingComma": "none",
